@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xml>
+
+<!-- [ALL] TRACE, DEBUG, INFO, WARN, ERROR, FATAL [OFF] -->
+
+<Configuration status="WARN" verbose="false" monitorInterval="5">
+
+	<properties>
+		<property name="filters">org.junit,org.apache.maven,sun.reflect,java.lang.reflect</property>
+	</properties>
+
+	<Appenders>
+		<Console name="console" target="SYSTEM_OUT">
+			<PatternLayout>
+				<MarkerPatternSelector defaultPattern="%white{%date{ABSOLUTE}} %cyan{[%thread]} %highlight{%5level - %-50logger{3.}} : %msg%n%xEx{filters(${filters})}">
+					<PatternMatch key="FLOW" pattern="%white{%date{ABSOLUTE}} %cyan{[%thread]}  %style{FLOW - %-50logger{1.} ====== %class{1.}.%method:%line %msg ======%n}{dim,white}" />
+				</MarkerPatternSelector>
+			</PatternLayout>
+		</Console>
+	</Appenders>
+
+	<Loggers>
+<!-- 		<logger name="org.springframework.core" level="info" /> -->
+<!-- 		<logger name="org.springframework.beans" level="info" /> -->
+<!-- 		<logger name="org.springframework.context" level="debug" /> -->
+<!-- 		<logger name="org.springframework.context.support.ReloadableResourceBundleMessageSource" level="info" /> -->
+		<logger name="org.springframework.security" level="debug" />
+<!-- 		<logger name="org.springframework.web" level="debug" /> -->
+<!-- 		<logger name="org.springframework" level="info" /> -->
+		
+		<logger name="com.zc.study" level="trace" />
+		
+		<Root level="info">
+			<AppenderRef ref="console"/>
+		</Root>
+	</Loggers>
+
+</Configuration>
