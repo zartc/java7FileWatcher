@@ -11,8 +11,9 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.integration.handler.MessageProcessor;
-import org.springframework.messaging.Message;
+
+import com.zc.study.fileinjection.springintegration.Message;
+import com.zc.study.fileinjection.springintegration.MessageProcessor;
 
 import lombok.extern.log4j.Log4j2;
 

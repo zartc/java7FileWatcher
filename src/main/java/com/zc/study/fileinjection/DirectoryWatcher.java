@@ -15,8 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
-import org.springframework.integration.handler.MessageProcessor;
-import org.springframework.messaging.support.GenericMessage;
+import com.zc.study.fileinjection.springintegration.GenericMessage;
+import com.zc.study.fileinjection.springintegration.Message;
+import com.zc.study.fileinjection.springintegration.MessageProcessor;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -82,7 +83,7 @@ public class DirectoryWatcher implements Runnable {
 			Path signaledPath = (Path)event.context();
 			
 			// create a message to give to the message handler
-			GenericMessage<Path> message = new GenericMessage<Path>(signaledPath, messageHeaders);
+			Message<Path> message = new GenericMessage<Path>(signaledPath, messageHeaders);
 			
 			// delegate to the message handler
 			messageHandler.processMessage(message);
