@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -15,7 +17,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import com.zc.study.fileinjection.springintegration.Message;
 import com.zc.study.fileinjection.springintegration.MessageProcessor;
 
-import lombok.extern.log4j.Log4j2;
 
 /**
  * https://docs.oracle.com/javase/tutorial/essential/io/notification.html
@@ -23,9 +24,10 @@ import lombok.extern.log4j.Log4j2;
  * @author Pascal
  */
 @SpringBootApplication
-@Log4j2
 public class FileInjectionApplication implements ApplicationRunner, MessageProcessor<Path> {
-	
+
+	private static final Logger log = LogManager.getLogger();
+
 	@Value("${FileInjectionApplication.dropbox}")
 	private String dropboxPath;
 	
@@ -37,7 +39,6 @@ public class FileInjectionApplication implements ApplicationRunner, MessageProce
 
 	@Override
 	public void run(ApplicationArguments args) throws Exception {
-		log.traceEntry("c'est parti", args);
 		List<String> dropboxPaths = args.getOptionValues("dropbox");
 		if(dropboxPaths == null) {
 			dropboxPaths = Collections.singletonList(dropboxPath);
