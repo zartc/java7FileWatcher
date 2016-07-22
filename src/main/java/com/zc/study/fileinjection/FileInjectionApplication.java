@@ -1,6 +1,7 @@
 package com.zc.study.fileinjection;
 
 import java.io.IOException;
+import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -30,8 +31,8 @@ public class FileInjectionApplication implements ApplicationRunner, MessageProce
 
 	@Value("${FileInjectionApplication.dropbox}")
 	private String dropboxPath;
-	
-	
+
+
 	public static void main(String[] args) throws IOException {
 		SpringApplication.run(FileInjectionApplication.class, args);
 	}
@@ -39,23 +40,30 @@ public class FileInjectionApplication implements ApplicationRunner, MessageProce
 
 	@Override
 	public void run(ApplicationArguments args) throws Exception {
-		List<String> dropboxPaths = args.getOptionValues("dropbox");
-		if(dropboxPaths == null) {
-			dropboxPaths = Collections.singletonList(dropboxPath);
+		List<String> watchdirs = args.getOptionValues("watchdir");
+		if (watchdirs == null) {
+			watchdirs = Collections.singletonList(dropboxPath);
 		}
-		
-		Path watchedDir = FileSystems.getDefault().getPath(dropboxPaths.get(0));
-		new DirectoryWatcher(watchedDir, this);
+
+		FileSystem fs = FileSystems.getDefault();
+		DirectoryWatcher directoryWatcher = new DirectoryWatcher();
+
+		for (String string : watchdirs) {
+			Path watchedDir = fs.getPath(string);
+			directoryWatcher.watch(watchedDir, this);
+		}
+
+		directoryWatcher.start();
 	}
 
 
 	@Override
 	public Path processMessage(Message<?> message) {
 		log.traceEntry("processing file {}", message);
-		
+
 		Object eventKind = message.getHeaders().get("event.kind");
 		Path path = (Path)message.getPayload();
-		
+
 		log.info("Processing a {} event for {}", eventKind, path);
 		return log.traceExit("done processing file {}", path);
 	}

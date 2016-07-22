@@ -1,6 +1,7 @@
 package com.zc.study.fileinjection;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
+import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
 import static java.nio.file.StandardWatchEventKinds.OVERFLOW;
 
@@ -10,53 +11,96 @@ import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.nio.file.Watchable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.zc.study.fileinjection.springintegration.GenericMessage;
 import com.zc.study.fileinjection.springintegration.Message;
 import com.zc.study.fileinjection.springintegration.MessageProcessor;
 
-import lombok.extern.log4j.Log4j2;
-
 
 /**
  * https://docs.oracle.com/javase/tutorial/essential/io/notification.html
- * 
- * @author Pascal
+ *
+ * @See http://docs.oracle.com/javase/tutorial/displayCode.html?code=http://docs.oracle.com/javase/tutorial/essential/io/examples/WatchDir.java
+ * @author Pascal JACOB
  */
-@Log4j2
 public class DirectoryWatcher implements Runnable {
+	private static final Logger log = LogManager.getLogger();
 
-	private WatchService watcher;
-	private MessageProcessor<Path> messageHandler;
+	private static final ExecutorService threadExecutor = Executors.newSingleThreadExecutor();
 
-	public DirectoryWatcher(Path watchedDir, MessageProcessor<Path> messageHandler) throws IOException {
-		log.info("Watching directory {}", watchedDir.toAbsolutePath());
+	private WatchService watchService;
 
-		this.messageHandler = messageHandler;
-		this.watcher = FileSystems.getDefault().newWatchService();
-		watchedDir.register(watcher, ENTRY_CREATE, ENTRY_MODIFY);
+	private Map<Path, Data> watchedDirs = new ConcurrentHashMap<>();
+	private Future<?> taskHandle;
 
-		Executors.newSingleThreadExecutor().submit(this);
+	private static class Data {
+		WatchKey watchKey;
+		MessageProcessor<Path> messageProcessor;
+
+		public Data(WatchKey watchKey, MessageProcessor<Path> messageProcessor) {
+			this.watchKey = watchKey;
+			this.messageProcessor = messageProcessor;
+		}
 	}
 
+	public DirectoryWatcher() throws IOException {
+		watchService = FileSystems.getDefault().newWatchService();
+	}
+
+	public void start() {
+		if ((taskHandle == null) || taskHandle.isDone()) {
+			taskHandle = threadExecutor.submit(this);
+		}
+	}
+
+	public void stop() {
+		if ((taskHandle != null) && !taskHandle.isDone()) {
+			taskHandle.cancel(false);
+		}
+	}
+
+	public void watch(Path watchedDir, MessageProcessor<Path> messageProcessor) throws IOException {
+		WatchKey watchKey = watchedDir.register(watchService, ENTRY_CREATE, ENTRY_MODIFY, ENTRY_DELETE);
+		watchedDirs.put(watchedDir, new Data(watchKey, messageProcessor));
+
+		log.info("added watching directory {}", watchedDir.toAbsolutePath().normalize());
+	}
+
+	public void remove(Path watchedDir) {
+		Data data = watchedDirs.get(watchedDir);
+		if (data != null) {
+			data.watchKey.cancel();
+			log.info("removed watching directory {}", watchedDir.toAbsolutePath().normalize());
+		}
+	}
+
+
+	@Override
 	public void run() {
 		WatchKey key;
 
 		do {
 			try {
 				// wait for key to be signaled
-				key = watcher.take();
+				key = watchService.take();
 
 				if (Thread.interrupted()) {
 					return;
 				}
 
-				// then process the events
-				processEvents(key.pollEvents());
+				if (key.isValid()) {
+					processEvents(key);
+				}
 			}
 			catch (InterruptedException x) {
 				return;
@@ -66,27 +110,32 @@ public class DirectoryWatcher implements Runnable {
 		} while (key.reset());
 	}
 
-	private void processEvents(List<WatchEvent<?>> events) {
-		for (WatchEvent<?> event : events) {
+	private void processEvents(WatchKey key) {
+		Watchable watchable = key.watchable();
+		Data data = watchedDirs.get(watchable);
+
+		for (WatchEvent<?> event : key.pollEvents()) {
 
 			// OVERFLOW event can occur if events are lost or discarded.
 			// If the event count is greater than 1 then this is a repeated event
-			if (event.kind() == OVERFLOW || event.count() > 1) {
+			if ((event.kind() == OVERFLOW) || (event.count() > 1)) {
 				continue;
 			}
 
 			// create a map for the headers
 			Map<String, Object> messageHeaders = new HashMap<>();
 			messageHeaders.put("event.kind", event.kind());
-			
+			messageHeaders.put("watchable", watchable);
+
 			// the path is the context of the event.
 			Path signaledPath = (Path)event.context();
-			
+			Path resolvedPath = ((Path)watchable).resolve(signaledPath);
+
 			// create a message to give to the message handler
-			Message<Path> message = new GenericMessage<Path>(signaledPath, messageHeaders);
-			
+			Message<Path> message = new GenericMessage<Path>(resolvedPath, messageHeaders);
+
 			// delegate to the message handler
-			messageHandler.processMessage(message);
+			data.messageProcessor.processMessage(message);
 		}
 	}
 }
